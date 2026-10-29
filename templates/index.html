@@ -1,0 +1,837 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ForgeWorks — Advanced Factory Management System</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+<div class="app-container">
+  <!-- SIDEBAR NAVIGATION -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="12 2 2 7 12 12 22 7 12 2"></polygon>
+          <polyline points="2 17 12 22 22 17"></polyline>
+          <polyline points="2 12 12 17 22 12"></polyline>
+        </svg>
+      </div>
+      <div>
+        <b>ForgeWorks</b>
+        <small>FACTORY OPS & DBMS</small>
+      </div>
+    </div>
+
+    <div class="nav-section">OPERATIONS</div>
+    <button class="nav active" data-page="overview">
+      <span class="nav-icon">▦</span>
+      <span>Overview</span>
+    </button>
+    <button class="nav" data-page="production_orders">
+      <span class="nav-icon">◷</span>
+      <span>Production Orders</span>
+      <span class="badge" id="badge-orders">{{ stats.active_orders }}</span>
+    </button>
+    <button class="nav" data-page="order_materials">
+      <span class="nav-icon">▤</span>
+      <span>Order Materials (BOM)</span>
+    </button>
+    <button class="nav" data-page="order_assignments">
+      <span class="nav-icon">👥</span>
+      <span>Worker Assignments</span>
+    </button>
+    <button class="nav" data-page="products">
+      <span class="nav-icon">▥</span>
+      <span>Products</span>
+    </button>
+    <button class="nav" data-page="raw_materials">
+      <span class="nav-icon">▤</span>
+      <span>Raw Materials</span>
+      {% if stats.low_stock_alerts > 0 %}
+        <span class="badge alert" id="badge-alerts">{{ stats.low_stock_alerts }}</span>
+      {% endif %}
+    </button>
+    <button class="nav" data-page="storage">
+      <span class="nav-icon">☖</span>
+      <span>Storage & Silos</span>
+    </button>
+
+    <div class="nav-section">INFRASTRUCTURE</div>
+    <button class="nav" data-page="machines">
+      <span class="nav-icon">⚙</span>
+      <span>Machines</span>
+    </button>
+    <button class="nav" data-page="maintenance">
+      <span class="nav-icon">🔧</span>
+      <span>Maintenance</span>
+      {% if stats.maintenance_active > 0 %}
+        <span class="badge warning">{{ stats.maintenance_active }}</span>
+      {% endif %}
+    </button>
+    <button class="nav" data-page="employees">
+      <span class="nav-icon">♙</span>
+      <span>Employees</span>
+    </button>
+    <button class="nav" data-page="departments">
+      <span class="nav-icon">🏛</span>
+      <span>Departments</span>
+    </button>
+    <button class="nav" data-page="suppliers">
+      <span class="nav-icon">⇄</span>
+      <span>Suppliers</span>
+    </button>
+
+    <div class="nav-section">DATABASE ARCHITECTURE</div>
+    <button class="nav" data-page="db_watcher">
+      <span class="nav-icon">👁</span>
+      <span>Watch Database</span>
+      <span class="badge highlight">Live</span>
+    </button>
+    <button class="nav" data-page="er_diagram">
+      <span class="nav-icon">◈</span>
+      <span>ER Diagram</span>
+      <span class="badge highlight">Updated</span>
+    </button>
+    <button class="nav" data-page="sql_lab">
+      <span class="nav-icon">⚡</span>
+      <span>SQL Query Lab</span>
+    </button>
+    <button class="nav" data-page="stock_audit">
+      <span class="nav-icon">📜</span>
+      <span>Stock Audit Log</span>
+    </button>
+
+    <div class="sidebar-bottom">
+      <div class="status-indicator">
+        <span class="pulse-dot"></span>
+        <div>
+          <b>Database: SQLite (PRAGMA FK=ON)</b>
+          <small>12 Entities & Triggers Active</small>
+        </div>
+      </div>
+      <button class="reset-btn" id="btn-reset-db" title="Reseed database with clean demo data">
+        ↺ Reseed DB
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN VIEW AREA -->
+  <main class="main">
+    <!-- TOPBAR -->
+    <header class="topbar">
+      <div>
+        <div class="breadcrumbs">
+          <span>FORGEWORKS OPERATIONS</span> / <span id="crumb">OVERVIEW</span>
+        </div>
+        <h1 id="page-title">Factory Overview & Real-time Operations</h1>
+      </div>
+      <div class="topbar-actions">
+        <div class="date-chip">
+          <span class="dot-live"></span>
+          <span>{{ today }}</span>
+        </div>
+        <button class="action-btn" id="topbar-quick-add" onclick="openAddModal()">
+          <span>+ Add Record</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- PAGE 1: OVERVIEW -->
+    <section id="overview-page" class="page active">
+      <!-- HERO WELCOME BANNER -->
+      <div class="hero-banner">
+        <div class="hero-content">
+          <span class="tag">PLANT A & B · SHIFT ROTATION</span>
+          <h2>Intelligent Factory Operations Hub</h2>
+          <p>Complete control across bill of materials (BOM), multi-machine production routing, supplier inventory, and preventive maintenance.</p>
+        </div>
+        <div class="hero-metrics">
+          <div class="hero-metric-box">
+            <span class="label">STORAGE OCCUPANCY</span>
+            <strong>{{ stats.storage_utilization }}%</strong>
+            <div class="bar-track"><div class="bar-fill" style="width: {{ stats.storage_utilization }}%;"></div></div>
+          </div>
+          <div class="hero-metric-box">
+            <span class="label">MACHINE HEALTH</span>
+            <strong>{{ stats.machines - stats.maintenance_active }} / {{ stats.machines }}</strong>
+            <small>Units operational</small>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI METRIC CARDS -->
+      <div class="kpi-grid">
+        <article class="kpi-card" onclick="showPage('production_orders')">
+          <div class="kpi-header">
+            <span>Active Orders</span>
+            <span class="kpi-icon blue">◷</span>
+          </div>
+          <strong>{{ stats.active_orders }}</strong>
+          <small class="kpi-footer">In progress & scheduled</small>
+        </article>
+
+        <article class="kpi-card" onclick="showPage('products')">
+          <div class="kpi-header">
+            <span>Finished Products</span>
+            <span class="kpi-icon teal">▥</span>
+          </div>
+          <strong>{{ stats.products }}</strong>
+          <small class="kpi-footer">Catalog items produced</small>
+        </article>
+
+        <article class="kpi-card" onclick="showPage('raw_materials')">
+          <div class="kpi-header">
+            <span>Raw Materials</span>
+            <span class="kpi-icon purple">▤</span>
+          </div>
+          <strong>{{ stats.raw_materials }}</strong>
+          <small class="kpi-footer">
+            {% if stats.low_stock_alerts > 0 %}
+              <span class="alert-text">⚠ {{ stats.low_stock_alerts }} below reorder</span>
+            {% else %}
+              <span class="ok-text">✓ All stocks healthy</span>
+            {% endif %}
+          </small>
+        </article>
+
+        <article class="kpi-card" onclick="showPage('maintenance')">
+          <div class="kpi-header">
+            <span>Maintenance Tasks</span>
+            <span class="kpi-icon amber">⚙</span>
+          </div>
+          <strong>{{ stats.maintenance_active }}</strong>
+          <small class="kpi-footer">{{ stats.machines }} machines monitored</small>
+        </article>
+
+        <article class="kpi-card" onclick="showPage('employees')">
+          <div class="kpi-header">
+            <span>Active Workforce</span>
+            <span class="kpi-icon emerald">♙</span>
+          </div>
+          <strong>{{ stats.employees }}</strong>
+          <small class="kpi-footer">Engineers & operators</small>
+        </article>
+      </div>
+
+      <!-- MAIN SPLIT CONTENT -->
+      <div class="grid-split">
+        <!-- RECENT PRODUCTION ORDERS -->
+        <article class="panel">
+          <div class="panel-header">
+            <div>
+              <h3>Active Production Orders</h3>
+              <p>Tracking orders with BOM materials, supervisor allocation, and machine assignment</p>
+            </div>
+            <button class="secondary-btn small" onclick="showPage('production_orders')">View All Orders →</button>
+          </div>
+          <div class="table-container">
+            <table>
+              <thead>
+                <tr>
+                  <th>ORDER #</th>
+                  <th>PRODUCT</th>
+                  <th>TARGET / PRODUCED</th>
+                  <th>SUPERVISOR</th>
+                  <th>MACHINE</th>
+                  <th>STATUS</th>
+                  <th>ACTIONS</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for o in recent_orders %}
+                <tr>
+                  <td><b>#{{ o.order_id }}</b></td>
+                  <td>
+                    <b>{{ o.product_name }}</b>
+                    <small class="dim">{{ o.start_date }} → {{ o.end_date or 'TBD' }}</small>
+                  </td>
+                  <td>
+                    <span>{{ o.produced_qty }} / {{ o.quantity }}</span>
+                    <div class="progress-bar">
+                      <div class="progress-fill" style="width: {{ [100, (o.produced_qty * 100 / o.quantity)|int]|min }}%;"></div>
+                    </div>
+                  </td>
+                  <td>{{ o.supervisor }}</td>
+                  <td>{{ o.machine_name or '—' }}</td>
+                  <td><span class="status-pill status-{{ o.status|lower|replace(' ', '-') }}">{{ o.status }}</span></td>
+                  <td>
+                    <button class="mini-btn" onclick="openOrderModal({{ o.order_id }})">View BOM</button>
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <!-- REORDER WATCH & STORAGE HEALTH -->
+        <div class="sidebar-panels">
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>Reorder Alerts</h3>
+                <p>Materials below minimum threshold</p>
+              </div>
+              <span class="count-badge red">{{ low_stock|length }}</span>
+            </div>
+            <div class="stock-alerts-list">
+              {% if low_stock %}
+                {% for item in low_stock %}
+                <div class="stock-alert-item">
+                  <div class="alert-icon">!</div>
+                  <div class="alert-details">
+                    <b>{{ item.material_name }}</b>
+                    <small>Supplier: {{ item.supplier_name }}</small>
+                    <div class="stock-bar-wrap">
+                      <div class="stock-bar-fill" style="width: {{ [100, (item.qty_in_stock * 100 / (item.min_stock_level or 1))|int]|min }}%;"></div>
+                    </div>
+                  </div>
+                  <div class="alert-numbers">
+                    <span class="stock-now">{{ item.qty_in_stock }}</span>
+                    <span class="stock-min">Min: {{ item.min_stock_level }} {{ item.unit }}</span>
+                  </div>
+                </div>
+                {% endfor %}
+              {% else %}
+                <p class="empty-state">All raw material stocks are currently above minimum threshold.</p>
+              {% endif %}
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-header">
+              <div>
+                <h3>Storage Warehouses</h3>
+                <p>Real-time location utilization</p>
+              </div>
+              <button class="link-btn" onclick="showPage('storage')">View</button>
+            </div>
+            <div class="storage-list">
+              {% for s in storage_units %}
+              <div class="storage-item">
+                <div class="storage-head">
+                  <b>{{ s.location }}</b>
+                  <span>{{ (s.current_stock * 100 // s.capacity) }}%</span>
+                </div>
+                <div class="storage-track">
+                  <div class="storage-fill" style="width: {{ [100, (s.current_stock * 100 // s.capacity)]|min }}%;"></div>
+                </div>
+                <small class="dim">{{ s.current_stock }} / {{ s.capacity }} units · {{ s.dept_name }}</small>
+              </div>
+              {% endfor %}
+            </div>
+          </article>
+        </div>
+      </div>
+
+      <!-- OVERVIEW SQL QUERY DEMO SNIPPET -->
+      <article class="panel query-highlight-panel">
+        <div class="panel-header">
+          <div>
+            <h3>Interactive SQL Query Lab</h3>
+            <p>Direct relational demonstration of 1:N, N:M, composite primary keys, triggers, and aggregations</p>
+          </div>
+          <button class="primary-btn" onclick="showPage('sql_lab')">Open Full Query Lab ↗</button>
+        </div>
+        <div class="quick-query-controls">
+          <select id="quick-query-select" onchange="runSelectedQuickQuery()">
+            <option value="raw_materials_all">1. All Raw Materials & Suppliers (1:N Join)</option>
+            <option value="low_stock_reorder">2. Low Stock Reorder Alerts (Business Rule)</option>
+            <option value="supplier_materials_count">3. Supplier-Raw Material 1:N Aggregation</option>
+            <option value="production_orders_full">4. Production Orders Multi-table JOIN</option>
+            <option value="order_materials_bom">5. Bill of Materials (BOM) with Composite PK</option>
+            <option value="employee_works_on">6. Employee Participation ('Works On' Tracking)</option>
+            <option value="storage_capacity_utilization">7. Storage Capacity & Utilization %</option>
+            <option value="machine_maintenance_costs">8. Machine Maintenance Cost Summary</option>
+            <option value="update_with_trigger">15. Safe UPDATE (Fires stock_audit trigger)</option>
+          </select>
+          <button class="secondary-btn" id="btn-quick-run" onclick="runSelectedQuickQuery()">Run Query</button>
+        </div>
+        <div class="query-code-preview">
+          <pre id="quick-sql-code"></pre>
+        </div>
+        <div id="quick-query-results" class="table-container mini-results"></div>
+      </article>
+    </section>
+
+    <!-- PAGE 2: GENERIC ENTITY DATA PAGES -->
+    <section id="data-page" class="page">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h3 id="table-heading">Entity Records</h3>
+            <p id="table-description">Live records from the SQLite relational database.</p>
+          </div>
+          <div class="search-and-action">
+            <div class="search-input-wrap">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="search-icon">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+              <input type="text" id="entity-search" placeholder="Search records..." aria-label="Search records">
+            </div>
+            <button class="primary-btn" onclick="openAddModal()">
+              <span>+ Add Entry</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="entity-table-container" class="table-container">
+          <div class="table-loader">Loading records…</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE 3: INTERACTIVE ER DIAGRAM VIEWER -->
+    <section id="er-diagram-page" class="page">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h3>Updated Relational Schema Architecture (ER Diagram)</h3>
+            <p>Visual map of all 12 entities, cardinalities, primary keys (PK), foreign keys (FK), and business relationships</p>
+          </div>
+          <span class="badge highlight">Production Standard Schema</span>
+        </div>
+
+        <!-- WHAT'S NEW BANNER -->
+        <div class="er-summary-grid">
+          <div class="summary-col">
+            <h4>★ What's New & Updated</h4>
+            <ul>
+              <li><strong>Supplier–Raw Material (1:N):</strong> One supplier can supply multiple raw materials.</li>
+              <li><strong>Dedicated PRODUCT Entity:</strong> Finished goods catalog separated from orders.</li>
+              <li><strong>ORDER_MATERIAL Weak Entity:</strong> Composite primary key <code>(order_id, material_id)</code> tracking materials used per batch.</li>
+              <li><strong>Machine Multi-Assignment:</strong> Production orders map to specific machines with runtime status.</li>
+              <li><strong>Employee Participation ("Works On"):</strong> Tracks multiple employees and roles assigned to each production order.</li>
+              <li><strong>STORAGE Entity:</strong> Warehouse bays and silos with max capacity & stock utilization.</li>
+              <li><strong>MAINTENANCE Entity:</strong> Full breakdown and service schedule tracking with costs and next due dates.</li>
+              <li><strong>Triggers & Audit Logging:</strong> Automatic stock deduction upon allocation and automated <code>stock_audit</code> logging.</li>
+            </ul>
+          </div>
+          <div class="summary-col">
+            <h4>✓ Why This Architecture Excels</h4>
+            <ul>
+              <li><strong>True 3rd Normal Form (3NF):</strong> Eliminates redundancy and update anomalies.</li>
+              <li><strong>Enforced Referential Integrity:</strong> <code>PRAGMA foreign_keys = ON</code> prevents orphan records.</li>
+              <li><strong>Comprehensive Cost Accounting:</strong> Computes material costs, machine service expenses, and department payroll vs budget.</li>
+              <li><strong>Audit Compliance:</strong> Historic quantity changes are immutable in <code>stock_audit</code>.</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- VISUAL DIAGRAM CANVAS -->
+        <div class="diagram-canvas">
+          <div class="diagram-row">
+            <!-- SUPPLIER -->
+            <div class="er-card" id="card-supplier">
+              <div class="er-card-header supplier-head">
+                <span class="card-type">ENTITY (1)</span>
+                <h5>SUPPLIER</h5>
+              </div>
+              <ul class="er-attr-list">
+                <li class="pk"><span>🔑 supplier_id</span> <small>INTEGER (PK)</small></li>
+                <li><span>supplier_name</span> <small>TEXT</small></li>
+                <li><span>contact_no</span> <small>TEXT</small></li>
+                <li><span>city</span> <small>TEXT</small></li>
+                <li><span>email</span> <small>TEXT (UNIQUE)</small></li>
+              </ul>
+              <div class="er-relation-tag">1 : N with RAW_MATERIAL</div>
+            </div>
+
+            <div class="connector-arrow">
+              <span>SUPPLIES</span>
+              <div class="arrow-line">──────▶</div>
+              <small>1 : N</small>
+            </div>
+
+            <!-- RAW_MATERIAL -->
+            <div class="er-card" id="card-raw-material">
+              <div class="er-card-header material-head">
+                <span class="card-type">ENTITY (N)</span>
+                <h5>RAW_MATERIAL</h5>
+              </div>
+              <ul class="er-attr-list">
+                <li class="pk"><span>🔑 material_id</span> <small>INTEGER (PK)</small></li>
+                <li><span>material_name</span> <small>TEXT</small></li>
+                <li><span>unit</span> <small>TEXT</small></li>
+                <li><span>qty_in_stock</span> <small>INTEGER</small></li>
+                <li><span>min_stock_level</span> <small>INTEGER</small></li>
+                <li><span>unit_cost</span> <small>REAL</small></li>
+                <li class="fk"><span>🔗 supplier_id</span> <small>FK → SUPPLIER</small></li>
+                <li class="fk"><span>🔗 storage_id</span> <small>FK → STORAGE</small></li>
+              </ul>
+            </div>
+
+            <div class="connector-arrow">
+              <span>USED_IN</span>
+              <div class="arrow-line">──────▶</div>
+              <small>1 : N</small>
+            </div>
+
+            <!-- ORDER_MATERIAL -->
+            <div class="er-card weak-card" id="card-order-material">
+              <div class="er-card-header weak-head">
+                <span class="card-type">WEAK ENTITY / JUNCTION</span>
+                <h5>ORDER_MATERIAL</h5>
+              </div>
+              <ul class="er-attr-list">
+                <li class="composite-pk"><span>🔑🔗 order_id</span> <small>PK, FK → ORDER</small></li>
+                <li class="composite-pk"><span>🔑🔗 material_id</span> <small>PK, FK → MATERIAL</small></li>
+                <li><span>qty_used</span> <small>INTEGER</small></li>
+              </ul>
+              <div class="er-relation-tag">Composite PK (order_id, material_id)</div>
+            </div>
+
+            <div class="connector-arrow">
+              <span>CONTAINS</span>
+              <div class="arrow-line">◀──────</div>
+              <small>N : 1</small>
+            </div>
+
+            <!-- PRODUCTION_ORDER -->
+            <div class="er-card" id="card-production-order">
+              <div class="er-card-header order-head">
+                <span class="card-type">ENTITY</span>
+                <h5>PRODUCTION_ORDER</h5>
+              </div>
+              <ul class="er-attr-list">
+                <li class="pk"><span>🔑 order_id</span> <small>INTEGER (PK)</small></li>
+                <li class="fk"><span>🔗 product_id</span> <small>FK → PRODUCT</small></li>
+                <li><span>quantity</span> <small>INTEGER</small></li>
+                <li><span>produced_qty</span> <small>INTEGER</small></li>
+                <li><span>status</span> <small>TEXT</small></li>
+                <li><span>start_date</span> <small>TEXT</small></li>
+                <li><span>end_date</span> <small>TEXT</small></li>
+                <li class="fk"><span>🔗 machine_id</span> <small>FK → MACHINE</small></li>
+                <li class="fk"><span>🔗 supervisor_id</span> <small>FK → EMPLOYEE</small></li>
+              </ul>
+            </div>
+
+            <div class="connector-arrow">
+              <span>MAKES</span>
+              <div class="arrow-line">◀──────</div>
+              <small>N : 1</small>
+            </div>
+
+            <!-- PRODUCT -->
+            <div class="er-card" id="card-product">
+              <div class="er-card-header product-head">
+                <span class="card-type">ENTITY</span>
+                <h5>PRODUCT</h5>
+              </div>
+              <ul class="er-attr-list">
+                <li class="pk"><span>🔑 product_id</span> <small>INTEGER (PK)</small></li>
+                <li><span>product_name</span> <small>TEXT</small></li>
+                <li><span>category</span> <small>TEXT</small></li>
+                <li><span>unit_price</span> <small>REAL</small></li>
+                <li><span>stock_qty</span> <small>INTEGER</small></li>
+              </ul>
+            </div>
+          </div>
+
+          <!-- SECOND ROW OF ER CARDS -->
+          <div class="diagram-row second-row">
+            <!-- STORAGE -->
+            <div class="er-card" id="card-storage">
+              <div class="er-card-header storage-head">
+                <span class="card-type">ENTITY</span>
+                <h5>STORAGE</h5>
+              </div>
+              <ul class="er-attr-list">
+                <li class="pk"><span>🔑 storage_id</span> <small>INTEGER (PK)</small></li>
+                <li><span>location</span> <small>TEXT (UNIQUE)</small></li>
+                <li><span>capacity</span> <small>INTEGER</small></li>
+                <li><span>current_stock</span> <small>INTEGER</small></li>
+                <li class="fk"><span>🔗 dept_id</span> <small>FK → DEPARTMENT</small></li>
+              </ul>
+              <div class="er-relation-tag">STORES Raw Materials</div>
+            </div>
+
+            <!-- DEPARTMENT -->
+            <div class="er-card" id="card-department">
+              <div class="er-card-header dept-head">
+                <span class="card-type">ENTITY</span>
+                <h5>DEPARTMENT</h5>
+              </div>
+              <ul class="er-attr-list">
+                <li class="pk"><span>🔑 dept_id</span> <small>INTEGER (PK)</small></li>
+                <li><span>dept_name</span> <small>TEXT (UNIQUE)</small></li>
+                <li><span>manager</span> <small>TEXT</small></li>
+                <li><span>phone</span> <small>TEXT</small></li>
+                <li><span>location</span> <small>TEXT</small></li>
+                <li><span>budget</span> <small>REAL</small></li>
+              </ul>
+              <div class="er-relation-tag">Manages Storage, Houses Machines, Employs Staff</div>
+            </div>
+
+            <!-- EMPLOYEE -->
+            <div class="er-card" id="card-employee">
+              <div class="er-card-header emp-head">
+                <span class="card-type">ENTITY</span>
+                <h5>EMPLOYEE</h5>
+              </div>
+              <ul class="er-attr-list">
+                <li class="pk"><span>🔑 emp_id</span> <small>INTEGER (PK)</small></li>
+                <li><span>emp_name</span> <small>TEXT</small></li>
+                <li><span>role</span> <small>TEXT</small></li>
+                <li><span>salary</span> <small>REAL</small></li>
+                <li class="fk"><span>🔗 dept_id</span> <small>FK → DEPARTMENT</small></li>
+                <li class="fk"><span>🔗 supervisor_id</span> <small>FK → EMPLOYEE</small></li>
+                <li><span>status</span> <small>TEXT</small></li>
+                <li><span>joined_on</span> <small>TEXT</small></li>
+              </ul>
+              <div class="er-relation-tag">Supervises & Participates in Orders</div>
+            </div>
+
+            <!-- MACHINE -->
+            <div class="er-card" id="card-machine">
+              <div class="er-card-header machine-head">
+                <span class="card-type">ENTITY</span>
+                <h5>MACHINE</h5>
+              </div>
+              <ul class="er-attr-list">
+                <li class="pk"><span>🔑 machine_id</span> <small>INTEGER (PK)</small></li>
+                <li><span>machine_name</span> <small>TEXT</small></li>
+                <li><span>status</span> <small>TEXT</small></li>
+                <li><span>install_date</span> <small>TEXT</small></li>
+                <li class="fk"><span>🔗 dept_id</span> <small>FK → DEPARTMENT</small></li>
+              </ul>
+              <div class="er-relation-tag">Runs Production Orders</div>
+            </div>
+
+            <!-- MAINTENANCE -->
+            <div class="er-card" id="card-maintenance">
+              <div class="er-card-header maint-head">
+                <span class="card-type">ENTITY</span>
+                <h5>MAINTENANCE</h5>
+              </div>
+              <ul class="er-attr-list">
+                <li class="pk"><span>🔑 maint_id</span> <small>INTEGER (PK)</small></li>
+                <li class="fk"><span>🔗 machine_id</span> <small>FK → MACHINE</small></li>
+                <li><span>maint_date</span> <small>TEXT</small></li>
+                <li><span>description</span> <small>TEXT</small></li>
+                <li><span>cost</span> <small>REAL</small></li>
+                <li><span>next_due_date</span> <small>TEXT</small></li>
+                <li><span>priority / status</span> <small>TEXT</small></li>
+              </ul>
+              <div class="er-relation-tag">1 : N with MACHINE</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE 4: SQL QUERY LAB -->
+    <section id="sql-lab-page" class="page">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h3>DBMS SQL Query Laboratory</h3>
+            <p>17 live demonstration queries covering multi-table JOINs, aggregations, GROUP BY, subqueries, and triggers</p>
+          </div>
+          <span class="sql-badge">SQLITE 3 · LIVE EXECUTION</span>
+        </div>
+
+        <div class="lab-controls">
+          <label for="full-query-select">Select Demonstration Query:</label>
+          <div class="query-select-row">
+            <select id="full-query-select" class="query-dropdown">
+              <optgroup label="1. Suppliers & Raw Materials (1:N)">
+                <option value="raw_materials_all">1. All Raw Materials & Suppliers (1:N Join)</option>
+                <option value="low_stock_reorder">2. Low Stock Reorder Alerts (Business Rule)</option>
+                <option value="supplier_materials_count">3. Supplier-Raw Material 1:N Aggregation & List</option>
+                <option value="subquery_expensive_materials">12. Above-Average Cost Materials (Subquery + AVG)</option>
+              </optgroup>
+              <optgroup label="2. Production Orders & Bill of Materials (BOM)">
+                <option value="production_orders_full">4. Production Orders with Product, Machine & Supervisor</option>
+                <option value="order_materials_bom">5. Bill of Materials (BOM) with Composite PK</option>
+                <option value="employee_works_on">6. Employee Participation ('Works On' Tracking N:M)</option>
+              </optgroup>
+              <optgroup label="3. Infrastructure, Storage & Maintenance">
+                <option value="storage_capacity_utilization">7. Storage Capacity & Stock Utilization %</option>
+                <option value="machine_maintenance_costs">8. Machine Maintenance Cost Summary & Count</option>
+                <option value="upcoming_maintenance_due">9. Pending Maintenance by Due Date</option>
+                <option value="departments_having_machines">14. Departments Housing Multiple Machines (HAVING)</option>
+              </optgroup>
+              <optgroup label="4. Financial & Workforce Analytics">
+                <option value="department_budget_payroll">10. Department Budget vs Annual Payroll %</option>
+                <option value="products_catalog_valuation">11. Product Catalog Valuation (Calculated Column)</option>
+                <option value="product_category_aggregates">13. Category Aggregates (GROUP BY + Totals)</option>
+              </optgroup>
+              <optgroup label="5. Transactions, Triggers & DML">
+                <option value="update_with_trigger">15. UPDATE Raw Material Stock (Fires Audit Trigger)</option>
+                <option value="audit_log_records">16. Trigger Stock Audit Log (Audit Trail)</option>
+                <option value="delete_maintenance_preview">17. DELETE Preview (Resolved Maintenance)</option>
+              </optgroup>
+            </select>
+            <button class="primary-btn" id="btn-full-run" onclick="runFullQueryLab()">Execute Query ⚡</button>
+            <button class="secondary-btn" id="btn-copy-sql" onclick="copyFullQuerySql()">Copy SQL</button>
+          </div>
+        </div>
+
+        <div class="sql-execution-card">
+          <div class="sql-banner">
+            <span id="full-query-label" class="query-title">Query Title</span>
+            <span id="full-query-count" class="query-rows-pill">0 rows</span>
+          </div>
+          <pre id="full-sql-code" class="code-block"></pre>
+          <div id="full-query-note" class="query-execution-note"></div>
+          <div id="full-query-results" class="table-container result-area"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- PAGE 5: LIVE DATABASE WATCHER -->
+    <section id="db-watcher-page" class="page">
+      <div class="panel">
+        <div class="panel-header">
+          <div>
+            <h3>Live Database Watcher & Table Explorer</h3>
+            <p>Direct view of raw SQLite tables, schemas, active row counts, and live query terminal in <code>factory.db</code></p>
+          </div>
+          <button class="secondary-btn small" onclick="loadDbWatcher()">↻ Refresh Tables</button>
+        </div>
+
+        <!-- TABLE SELECTOR PILLS -->
+        <div class="db-tables-nav" id="db-tables-pills">
+          <div class="table-loader">Loading database tables…</div>
+        </div>
+
+        <!-- SELECTED TABLE DETAILS -->
+        <div class="db-table-viewer-card">
+          <div class="db-table-header">
+            <div>
+              <h4 id="watcher-table-title">Table: loading…</h4>
+              <p id="watcher-table-meta">0 rows · SQLite table</p>
+            </div>
+            <button class="mini-btn" id="watcher-toggle-schema-btn" onclick="toggleWatcherSchema()">Toggle DDL / Schema</button>
+          </div>
+
+          <!-- DDL SCHEMA BLOCK (COLLAPSIBLE) -->
+          <div id="watcher-schema-block" style="display: none; margin-bottom: 14px;">
+            <pre id="watcher-table-ddl" class="code-block"></pre>
+          </div>
+
+          <!-- RAW TABLE DATA -->
+          <div id="watcher-table-data" class="table-container" style="max-height: 380px;"></div>
+        </div>
+
+        <!-- CUSTOM SQL CONSOLE -->
+        <div class="db-custom-console">
+          <div class="panel-header" style="margin-bottom: 10px;">
+            <div>
+              <h4>Live SQL Query Terminal</h4>
+              <p>Execute custom read queries directly on <code>factory.db</code> (e.g., inspect audit logs or junctions)</p>
+            </div>
+            <div class="quick-sql-shortcuts">
+              <button class="mini-btn" onclick="setCustomSql('SELECT * FROM stock_audit ORDER BY id DESC;')">stock_audit</button>
+              <button class="mini-btn" onclick="setCustomSql('SELECT * FROM order_materials;')">order_materials</button>
+              <button class="mini-btn" onclick="setCustomSql('SELECT * FROM order_assignments;')">order_assignments</button>
+              <button class="mini-btn" onclick="setCustomSql('SELECT * FROM production_orders;')">production_orders</button>
+            </div>
+          </div>
+          <div class="custom-sql-input-row">
+            <input type="text" id="custom-sql-input" placeholder="SELECT * FROM raw_materials WHERE qty_in_stock <= min_stock_level;" value="SELECT * FROM stock_audit ORDER BY id DESC;">
+            <button class="primary-btn" onclick="executeCustomSql()">Execute ⚡</button>
+          </div>
+          <div id="custom-sql-feedback" class="query-execution-note"></div>
+          <div id="custom-sql-results" class="table-container mini-results"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- FOOTER -->
+    <footer class="app-footer">
+      <div>
+        <strong>ForgeWorks Factory Management System</strong> — Academic DBMS Project Demonstration
+      </div>
+      <div class="footer-meta">
+        <span>SQLite 3 Engine</span> · <span>Normalized Relational Architecture</span>
+      </div>
+    </footer>
+  </main>
+</div>
+
+<!-- MODAL: ADD RECORD -->
+<div id="add-modal" class="modal-backdrop">
+  <div class="modal-card">
+    <div class="modal-header">
+      <div>
+        <h3 id="modal-title">Add New Record</h3>
+        <p id="modal-desc">Record will be saved directly into the factory SQLite database.</p>
+      </div>
+      <button class="modal-close-btn" onclick="closeAddModal()">&times;</button>
+    </div>
+    <form id="modal-add-form" class="modal-form">
+      <div id="modal-fields-container" class="form-fields-grid"></div>
+      <div id="modal-form-feedback" class="form-feedback"></div>
+      <div class="modal-actions">
+        <button type="button" class="secondary-btn" onclick="closeAddModal()">Cancel</button>
+        <button type="submit" class="primary-btn" id="btn-save-record">Save Record +</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- MODAL: ORDER BOM & WORKFORCE DETAILS -->
+<div id="order-details-modal" class="modal-backdrop">
+  <div class="modal-card wide-modal">
+    <div class="modal-header">
+      <div>
+        <h3 id="order-modal-title">Order Details & Bill of Materials</h3>
+        <p id="order-modal-desc">Materials consumed (Composite PK) and assigned staff.</p>
+      </div>
+      <button class="modal-close-btn" onclick="closeOrderModal()">&times;</button>
+    </div>
+    <div class="order-modal-content">
+      <div id="order-meta-box" class="order-meta-grid"></div>
+
+      <div class="modal-section-head">
+        <h4>Bill of Materials (Raw Materials Used)</h4>
+        <button type="button" class="mini-btn" id="btn-toggle-add-material" onclick="toggleAddMaterialInline()">+ Allocate Material</button>
+      </div>
+      <form id="inline-add-material-form" class="inline-subform" style="display: none;" onsubmit="saveMaterialToOrder(event)">
+        <input type="hidden" id="inline-mat-order-id">
+        <div class="inline-form-row">
+          <select id="inline-mat-id" required>
+            <option value="">Select Raw Material…</option>
+          </select>
+          <input type="number" id="inline-mat-qty" placeholder="Qty Used" min="1" required style="width: 120px;">
+          <button type="submit" class="primary-btn small">Allocate +</button>
+        </div>
+        <div id="inline-mat-feedback" class="form-feedback"></div>
+      </form>
+      <div id="order-materials-container" class="table-container mini"></div>
+
+      <div class="modal-section-head" style="margin-top: 16px;">
+        <h4>Assigned Personnel ("Works On" Participation)</h4>
+        <button type="button" class="mini-btn" id="btn-toggle-assign-worker" onclick="toggleAssignWorkerInline()">+ Assign Worker</button>
+      </div>
+      <form id="inline-assign-worker-form" class="inline-subform" style="display: none;" onsubmit="saveWorkerToOrder(event)">
+        <input type="hidden" id="inline-assign-order-id">
+        <div class="inline-form-row">
+          <select id="inline-assign-emp-id" required>
+            <option value="">Select Employee…</option>
+          </select>
+          <input type="text" id="inline-assign-role" placeholder="Role (e.g. Lead, Operator)" required style="width: 160px;">
+          <input type="number" id="inline-assign-hours" placeholder="Hours" min="0" step="0.5" value="0" required style="width: 100px;">
+          <button type="submit" class="primary-btn small">Assign +</button>
+        </div>
+        <div id="inline-assign-feedback" class="form-feedback"></div>
+      </form>
+      <div id="order-assignments-container" class="table-container mini"></div>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="secondary-btn" onclick="closeOrderModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
